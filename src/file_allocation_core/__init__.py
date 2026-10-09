@@ -10,6 +10,6 @@ package reads and writes.
 
 from . import customer_folders, routing
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 __all__ = ["customer_folders", "routing"]

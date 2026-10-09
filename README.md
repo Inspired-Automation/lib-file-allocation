@@ -23,13 +23,16 @@ the id up in `Titan_INSE.dbo.XDRIVE_CUSTOMER_MASTER` (owned by
 
 | Table says | Action |
 |---|---|
-| id found, folder name matches Sugar's current name | file into that folder |
-| id found, name differs | rename the folder, update the table, write an audit row, then file |
+| id found, folder named exactly as Sugar's current name | file into that folder |
+| id found, name differs in any way (case included) | rename the folder to Sugar's exact name, update the table, write an audit row, then file |
 | id not found | create the folder under Sugar's name, insert the table row ("Row added"), then file |
 
-Names are compared with `name_key()`: case, whitespace (including NBSP), and the
-known variations **Ltd/Limited** and **&/and** are ignored, and never trigger a
-rename. If both the old and the new folder exist, nothing is renamed: the
+The folder, its table row and its workbook row all carry the **exact** Sugar
+account name (made safe for Windows). A document whose name differs only by
+case, whitespace (including NBSP), **Ltd/Ltd./Limited** or **&/and** is matched to
+its account with `name_key()` and filed into the Sugar-named folder; the folder
+is renamed to Sugar's spelling first if needed. If two different folders exist
+for the old and the new name, nothing is renamed: the
 document goes into the folder the table holds, and the daily x-drive sync
 reports the pair for a human to merge.
 

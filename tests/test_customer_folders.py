@@ -1,3 +1,4 @@
+from pathlib import Path
 import pyodbc
 import pytest
 
@@ -62,12 +63,56 @@ def test_new_id_inserts_row_and_audit(fake_db, tmp_path):
     assert db.committed == 1 and db.closed == 1
 
 
-def test_matching_name_returns_stored_folder_unchanged(fake_db, tmp_path):
-    db = fake_db([{"id": 1, "customer": "acme limited", "customer_id": ID}])
-    (tmp_path / "acme limited").mkdir()
-    assert cf.resolve_customer_folder(tmp_path, ID, "ACME LTD", "odc", dsn="J") == "acme limited"
+def test_exact_sugar_name_returns_stored_folder_unchanged(fake_db, tmp_path):
+    db = fake_db([{"id": 1, "customer": "ACME LIMITED", "customer_id": ID}])
+    (tmp_path / "ACME LIMITED").mkdir()
+    assert cf.resolve_customer_folder(tmp_path, ID, "ACME LIMITED", "odc", dsn="J") == "ACME LIMITED"
     assert db.audit == []
-    assert (tmp_path / "acme limited").is_dir()
+
+
+def test_ltd_variation_is_renamed_to_exact_sugar_name(fake_db, tmp_path, no_shortcuts):
+    """A document for 'acme ltd' files into the Sugar-named folder."""
+    db = fake_db([{"id": 1, "customer": "acme ltd", "customer_id": ID}])
+    (tmp_path / "acme ltd").mkdir()
+    assert cf.resolve_customer_folder(tmp_path, ID, "ACME LIMITED", "odc", dsn="J") == "ACME LIMITED"
+    assert cf.disk_name(tmp_path, "acme limited") == "ACME LIMITED"
+    assert not (tmp_path / "acme ltd").exists()
+    assert db.rows[0]["customer"] == "ACME LIMITED"
+
+
+def test_case_only_difference_renames_folder_in_place(fake_db, tmp_path, no_shortcuts):
+    db = fake_db([{"id": 1, "customer": "Abbeycroft Leisure", "customer_id": ID}])
+    (tmp_path / "Abbeycroft Leisure" / "INVOICE").mkdir(parents=True)
+    (tmp_path / "Abbeycroft Leisure" / "INVOICE" / "bill.pdf").write_text("pdf")
+    assert cf.resolve_customer_folder(tmp_path, ID, "ABBEYCROFT LEISURE", "odc", dsn="J") == "ABBEYCROFT LEISURE"
+    assert cf.disk_name(tmp_path, "abbeycroft leisure") == "ABBEYCROFT LEISURE"
+    assert (tmp_path / "ABBEYCROFT LEISURE" / "INVOICE" / "bill.pdf").read_text() == "pdf"
+    assert [p.name for p in tmp_path.iterdir()] == ["ABBEYCROFT LEISURE"]
+    assert db.rows[0]["customer"] == "ABBEYCROFT LEISURE"
+    assert db.audit == [("ABBEYCROFT LEISURE", "Customer", "Abbeycroft Leisure", "ABBEYCROFT LEISURE", "odc")]
+
+
+def test_case_only_with_folder_already_right_updates_table_only(fake_db, tmp_path):
+    db = fake_db([{"id": 1, "customer": "Abbeycroft Leisure", "customer_id": ID}])
+    (tmp_path / "ABBEYCROFT LEISURE").mkdir()
+    assert cf.resolve_customer_folder(tmp_path, ID, "ABBEYCROFT LEISURE", "odc", dsn="J") == "ABBEYCROFT LEISURE"
+    assert cf.disk_name(tmp_path, "abbeycroft leisure") == "ABBEYCROFT LEISURE"
+    assert db.rows[0]["customer"] == "ABBEYCROFT LEISURE" and len(db.audit) == 1
+
+
+def test_case_only_rename_failure_keeps_old_folder(fake_db, tmp_path, monkeypatch):
+    db = fake_db([{"id": 1, "customer": "Abbeycroft Leisure", "customer_id": ID}])
+    (tmp_path / "Abbeycroft Leisure").mkdir()
+    real_rename = cf.Path.rename
+
+    def fail_second(self, target):
+        if ".renaming-" in self.name and Path(target).name == "ABBEYCROFT LEISURE":
+            raise PermissionError(32, "in use")
+        return real_rename(self, target)
+    monkeypatch.setattr(cf.Path, "rename", fail_second)
+    assert cf.resolve_customer_folder(tmp_path, ID, "ABBEYCROFT LEISURE", "odc", dsn="J") == "Abbeycroft Leisure"
+    assert [p.name for p in tmp_path.iterdir()] == ["Abbeycroft Leisure"]
+    assert db.audit == []
 
 
 def test_mismatch_renames_folder_updates_key_and_audits(fake_db, tmp_path, no_shortcuts):
@@ -150,7 +195,7 @@ def test_several_rows_for_one_id_uses_matching_row(fake_db, tmp_path):
     ])
     (tmp_path / "Bristol Old").mkdir()
     (tmp_path / "Bristol NHS").mkdir()
-    assert cf.resolve_customer_folder(tmp_path, ID, "bristol nhs", "odc", dsn="J") == "Bristol NHS"
+    assert cf.resolve_customer_folder(tmp_path, ID, "Bristol NHS", "odc", dsn="J") == "Bristol NHS"
     assert db.audit == []
 
 
@@ -221,3 +266,8 @@ def test_only_deleted_row_under_sugar_name_is_reused_not_duplicated(fake_db, tmp
     db = fake_db([{"id": 7, "customer": "Back Again Ltd", "customer_id": ID, "deleted": 1}])
     assert cf.resolve_customer_folder(tmp_path, ID, "BACK AGAIN LIMITED", "ebill", dsn="J") == "Back Again Ltd"
     assert len(db.rows) == 1 and db.audit == []
+
+
+def test_pick_row_prefers_exact_name():
+    rows = [cf.CustomerRow(1, "acme limited"), cf.CustomerRow(2, "ACME LIMITED")]
+    assert cf.pick_row(rows, "ACME LIMITED").id == 2

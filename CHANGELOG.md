@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.2] - 2026-10-09
+
+### Changed
+- A customer folder, its table row and (through x-drive stage 1) its
+  workbook row carry the **exact** Sugar account name. A folder whose name
+  differs from Sugar's in any way, case included (`Abbeycroft Leisure` vs
+  `ABBEYCROFT LEISURE`) or by Ltd/Limited, &/and or a stray NBSP, is renamed
+  to Sugar's spelling before filing. `name_key()` is now only for matching a
+  name to an account, never for deciding a rename.
+- `pick_row` prefers the row named exactly as Sugar's name.
+
+### Added
+- `rename_folder` (case-only renames go through a temporary name, since
+  Windows treats them as one folder; a half-done one is put back),
+  `same_folder`, `disk_name`.
+
 ## [0.1.1] - 2026-10-09
 
 ### Changed

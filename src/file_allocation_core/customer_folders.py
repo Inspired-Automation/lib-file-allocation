@@ -9,15 +9,18 @@ never gets a second folder.
 
 The rule, for a filing that knows the customer's Sugar id:
 
-    * id in the table, folder name matches Sugar's current name -> that folder
-    * id in the table, name differs   -> rename the folder, update the
-                                         table's key, audit it, then file
-    * id not in the table             -> new folder under Sugar's name, and a
-                                         new table row ("Row added")
+    * id in the table, folder named exactly as Sugar's current name
+      (made safe for Windows)       -> that folder
+    * id in the table, name differs -> rename the folder to Sugar's exact
+                                       name (case included), update the
+                                       table's key, audit it, then file
+    * id not in the table           -> new folder under Sugar's name, and a
+                                       new table row ("Row added")
 
-Names are compared with name_key(), which ignores case, whitespace
-(including NBSP) and the known variations Ltd/Limited and &/and, so none of
-those ever trigger a rename.
+So a folder, its table row and its workbook row all carry the Sugar account
+name exactly (decided 2026-10-09). name_key(), which ignores case,
+whitespace (including NBSP) and the known variations Ltd/Limited and &/and,
+is only for *matching* a name to an account, never for deciding a rename.
 
 sugar_id.txt is retired: nothing in this module reads or writes it.
 """
@@ -25,7 +28,9 @@ sugar_id.txt is retired: nothing in this module reads or writes it.
 from __future__ import annotations
 
 import logging
+import os
 import re
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -140,13 +145,61 @@ def _rows_for_id(cursor, sugar_id: str) -> list[CustomerRow]:
 
 
 def pick_row(rows: list[CustomerRow], target: str) -> CustomerRow:
-    """The row to file into when several share one Sugar id: the one whose
-    name already matches Sugar's (by name_key), else the oldest."""
+    """The row to file into when several share one Sugar id: the one named
+    exactly as Sugar's name, else one matching it by name_key, else the
+    oldest."""
+    for row in rows:
+        if row.customer == target:
+            return row
     wanted = name_key(target)
     for row in rows:
         if name_key(row.customer) == wanted:
             return row
     return rows[0]
+
+
+# ---------------------------------------------------------------------------
+# Folder renames on the share
+# ---------------------------------------------------------------------------
+
+def disk_name(root, name: str) -> str | None:
+    """The folder's name exactly as the share stores it (Windows lookups
+    ignore case, so `root / name` existing says nothing about its case)."""
+    wanted = name.lower()
+    try:
+        with os.scandir(root) as entries:
+            for entry in entries:
+                if entry.name.lower() == wanted and entry.is_dir():
+                    return entry.name
+    except OSError:
+        return None
+    return None
+
+
+def same_folder(a: Path, b: Path) -> bool:
+    """True when two paths that both exist are one folder (Windows: names
+    differing only in case)."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
+def rename_folder(old_path: Path, new_path: Path) -> None:
+    """Rename a folder, including a case-only rename, which Windows would
+    otherwise treat as renaming a folder onto itself: that goes through a
+    temporary name. Raises OSError (e.g. a file open in the folder); a
+    half-done case-only rename is put back first."""
+    if old_path.name.lower() != new_path.name.lower():
+        old_path.rename(new_path)
+        return
+    temp = old_path.with_name(f"{old_path.name}.renaming-{uuid.uuid4().hex[:8]}")
+    old_path.rename(temp)
+    try:
+        temp.rename(new_path)
+    except OSError:
+        temp.rename(old_path)
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +275,8 @@ def rename_customer_folder(conn, root, row: CustomerRow, target: str, source: st
     | missing    | exists        | key updated, audited (already renamed)     |
     | missing    | missing       | key updated, audited (caller creates it)   |
     | exists     | exists        | collision: nothing changed, old returned   |
+    | same folder, case differs  | folder renamed to Sugar's case (via a     |
+    |                            | temporary name), key updated, audited     |
 
     Nothing is changed either when another table row already holds the
     target name (the unique index on customer would reject it), or when the
@@ -237,6 +292,16 @@ def rename_customer_folder(conn, root, row: CustomerRow, target: str, source: st
     new_path = root / target
     old_exists = old_path.is_dir()
     new_exists = new_path.is_dir()
+
+    if old_exists and new_exists and same_folder(old_path, new_path):
+        # Names differ only in case: one folder. Rename it unless the share
+        # already spells it Sugar's way (only the table was out of date).
+        on_disk = disk_name(root, target)
+        if on_disk == target:
+            old_exists = False
+        else:
+            old_path = root / (on_disk or row.customer)
+            new_exists = False
 
     if old_exists and new_exists:
         logger.warning(
@@ -256,7 +321,7 @@ def rename_customer_folder(conn, root, row: CustomerRow, target: str, source: st
 
     if old_exists:
         try:
-            old_path.rename(new_path)
+            rename_folder(old_path, new_path)
         except OSError:
             logger.exception(
                 "CUSTOMER_FOLDERS - could not rename '%s' to '%s' (a file may be open); "
@@ -345,7 +410,7 @@ def resolve_customer_folder(
             return target
 
         row = pick_row(rows, target)
-        if name_key(row.customer) == name_key(target):
+        if row.customer == target:
             return row.customer
         return rename_customer_folder(conn, root, row, target, source)
     except pyodbc.Error:

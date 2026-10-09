@@ -40,7 +40,11 @@ not a Control Room bot: no entry point of its own. Consumers:
   &/and), trailing dots dropped. There is deliberately **no wildcard or
   fuzzy matching**: the business confirmed Ltd/Limited and &/and are the
   only known variations (2026-10-09). Add a new one to `NAME_VARIATIONS`
-  only.
+  only. It decides **matching only**: whether a folder is renamed is an
+  **exact** comparison with `safe_folder_name(Sugar name)`, case included
+  (0.1.2), so folder, table and workbook all carry the Sugar account name.
+  Case-only renames go through a temporary name (`rename_folder`), since
+  Windows sees one folder.
 - **`safe_folder_name()`** turns a Sugar name into a folder name: `/`
   removed (matches the ebill bot's legacy rule), other illegal characters
   replaced with `-`, trailing dots/spaces dropped.
@@ -65,6 +69,8 @@ not a Control Room bot: no entry point of its own. Consumers:
   (`repoint_shortcuts`). Without pywin32 they're skipped with a warning and
   x-drive stage 1, which has pywin32, re-points them.
 
+- The caller's `sugar_name` decides renames, so it must be current. ODC and emailed invoices query Sugar live; ebills' Toolkit `/resolve` cache is ~15 min behind; post-allocation's Toolkit alias lookup is up to a day behind (accepted), so it can briefly rename a folder back after a Sugar rename.
+
 ## Change Log
 - 2026-10-09: 0.1.0. Created from `lib-odc-core`'s `file_allocation`
   routing and the x-drive customer master rename rules, so every POST
@@ -72,3 +78,6 @@ not a Control Room bot: no entry point of its own. Consumers:
 - 2026-10-09: 0.1.1. Reads `deleted` (was `folder_missing`, renamed by
   x-drive migration 004); deleted rows are skipped, or reused when they are
   the account's only row under Sugar's name.
+- 2026-10-09: 0.1.2. Folders are renamed to the exact Sugar name (case,
+  Ltd/Limited, &/and and NBSP differences included); `rename_folder`
+  handles case-only renames; `pick_row` prefers the exact-name row.
