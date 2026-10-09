@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "file-allocation-core"
+version = "0.1.0"
+description = "Shared POST RECEIVED filing rules: client routing, customer folder tree, and customer folder resolution/renaming against Titan_INSE.dbo.XDRIVE_CUSTOMER_MASTER."
+readme = "README.md"
+requires-python = ">=3.14"
+authors = [
+    { name = "Inspired Automation Team" }
+]
+dependencies = [
+    "pyodbc>=5.3",
+]
+
+[project.urls]
+Repository = "https://github.com/Inspired-Automation/lib-file-allocation"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-mock>=3.12"]
+# ARCHIVE.lnk / HOLDING.lnk shortcuts. Imported lazily: without it, shortcuts
+# are skipped with a warning and everything else works.
+shortcuts = ["pywin32>=306"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
