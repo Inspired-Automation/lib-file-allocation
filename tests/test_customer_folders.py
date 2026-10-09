@@ -57,7 +57,7 @@ def test_new_id_inserts_row_and_audit(fake_db, tmp_path):
     db = fake_db()
     folder = cf.resolve_customer_folder(tmp_path, ID.upper(), "Acme Ltd", "ebill", dsn="Jupiter")
     assert folder == "Acme Ltd"
-    assert db.rows == [{"id": 1, "customer": "Acme Ltd", "customer_id": ID, "folder_missing": 0}]
+    assert db.rows == [{"id": 1, "customer": "Acme Ltd", "customer_id": ID, "deleted": 0}]
     assert db.audit == [("Acme Ltd", cf.ROW_ADDED, None, "Acme Ltd", "ebill")]
     assert db.committed == 1 and db.closed == 1
 
@@ -154,8 +154,8 @@ def test_several_rows_for_one_id_uses_matching_row(fake_db, tmp_path):
     assert db.audit == []
 
 
-def test_folder_missing_rows_are_ignored(fake_db, tmp_path):
-    db = fake_db([{"id": 1, "customer": "Gone Co", "customer_id": ID, "folder_missing": 1}])
+def test_deleted_rows_are_not_filed_into(fake_db, tmp_path):
+    db = fake_db([{"id": 1, "customer": "Gone Co", "customer_id": ID, "deleted": 1}])
     assert cf.resolve_customer_folder(tmp_path, ID, "Fresh Co", "odc", dsn="J") == "Fresh Co"
     assert [r["customer"] for r in db.rows] == ["Gone Co", "Fresh Co"]
 
@@ -203,3 +203,21 @@ def test_repoint_shortcuts_without_pywin32(monkeypatch, tmp_path):
     link.write_text("x")
     monkeypatch.setattr(cf, "_shell", lambda: None)
     assert cf.repoint_shortcuts(tmp_path) == 0
+
+
+def test_merged_row_ignored_in_favour_of_live_row(fake_db, tmp_path):
+    """Abodus was merged into ABODUS LIMITED: the deleted row is never chosen
+    or renamed, even though it is older."""
+    db = fake_db([
+        {"id": 1908, "customer": "Abodus", "customer_id": ID, "deleted": 1},
+        {"id": 1913, "customer": "ABODUS LIMITED", "customer_id": ID},
+    ])
+    (tmp_path / "ABODUS LIMITED").mkdir()
+    assert cf.resolve_customer_folder(tmp_path, ID, "ABODUS LIMITED", "odc", dsn="J") == "ABODUS LIMITED"
+    assert db.audit == [] and len(db.rows) == 2
+
+
+def test_only_deleted_row_under_sugar_name_is_reused_not_duplicated(fake_db, tmp_path):
+    db = fake_db([{"id": 7, "customer": "Back Again Ltd", "customer_id": ID, "deleted": 1}])
+    assert cf.resolve_customer_folder(tmp_path, ID, "BACK AGAIN LIMITED", "ebill", dsn="J") == "Back Again Ltd"
+    assert len(db.rows) == 1 and db.audit == []

@@ -20,11 +20,11 @@ class FakeCursor:
             raise pyodbc.OperationalError("08S01", "Communication link failure")
         if sql == cf.SELECT_ROWS_FOR_ID:
             (sugar_id,) = params
-            self._result = sorted(
-                (r["id"], r["customer"])
-                for r in db.rows
-                if r["customer_id"] == sugar_id and not r["folder_missing"]
-            )
+            self._result = [
+                (r["id"], r["customer"], r["deleted"])
+                for r in sorted(db.rows, key=lambda r: (r["deleted"], r["id"]))
+                if r["customer_id"] == sugar_id
+            ]
         elif sql == cf.SELECT_ROW_HOLDING_NAME:
             name, row_id = params
             self._result = [
@@ -43,7 +43,7 @@ class FakeCursor:
                 raise pyodbc.IntegrityError("23000", "Cannot insert duplicate key row")
             db.rows.append({
                 "id": max((r["id"] for r in db.rows), default=0) + 1,
-                "customer": name, "customer_id": sugar_id, "folder_missing": 0,
+                "customer": name, "customer_id": sugar_id, "deleted": 0,
             })
             self._result = []
         elif sql == cf.INSERT_AUDIT_ROW:
@@ -62,7 +62,7 @@ class FakeCursor:
 class FakeDB:
     def __init__(self, rows=None):
         self.rows = [
-            {"folder_missing": 0, **row} for row in (rows or [])
+            {"deleted": 0, **row} for row in (rows or [])
         ]
         self.audit = []
         self.fail_on = None

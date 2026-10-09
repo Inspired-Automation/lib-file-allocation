@@ -25,7 +25,10 @@ not a Control Room bot: no entry point of its own. Consumers:
   workbook into the table daily. This package only reads by
   `customer_id`, inserts a minimal row for a new Sugar id, renames the
   `customer` key, and writes audit rows with `changed_by` set to the
-  caller's `source`.
+  caller's `source`. Rows with `deleted = 1` (folder removed, e.g. merged into
+  another folder of the same account, `merged_into` says which) are never
+  filed into or renamed; one already under Sugar's name is reused rather than
+  duplicated when it is the account's only row.
 - `resolve_customer_folder` opens its **own** connection per call, so its
   commits never touch the caller's transaction.
 
@@ -66,3 +69,6 @@ not a Control Room bot: no entry point of its own. Consumers:
 - 2026-10-09: 0.1.0. Created from `lib-odc-core`'s `file_allocation`
   routing and the x-drive customer master rename rules, so every POST
   RECEIVED filer shares one implementation.
+- 2026-10-09: 0.1.1. Reads `deleted` (was `folder_missing`, renamed by
+  x-drive migration 004); deleted rows are skipped, or reused when they are
+  the account's only row under Sugar's name.

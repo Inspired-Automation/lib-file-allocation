@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "file-allocation-core"
-version = "0.1.0"
+version = "0.1.1"
 description = "Shared POST RECEIVED filing rules: client routing, customer folder tree, and customer folder resolution/renaming against Titan_INSE.dbo.XDRIVE_CUSTOMER_MASTER."
 readme = "README.md"
 requires-python = ">=3.14"

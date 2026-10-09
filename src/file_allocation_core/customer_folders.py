@@ -94,11 +94,15 @@ def safe_folder_name(name) -> str:
 # SQL
 # ---------------------------------------------------------------------------
 
+# deleted = 1 marks a row whose folder has been removed (merged into another
+# folder of the same account, or just gone). Those are read too, so a filing
+# for an account whose only row is deleted can reuse that row's name rather
+# than insert a duplicate; x-drive stage 1 undeletes it once the folder is back.
 SELECT_ROWS_FOR_ID = f"""
-SELECT id, customer
+SELECT id, customer, deleted
 FROM {MASTER_TABLE}
-WHERE customer_id = ? AND folder_missing = 0
-ORDER BY id
+WHERE customer_id = ?
+ORDER BY deleted, id
 """
 
 # Exact match under the column's (case-insensitive) collation: the same test
@@ -127,11 +131,12 @@ VALUES (?, ?, ?, ?, ?)
 class CustomerRow:
     id: int
     customer: str
+    deleted: bool = False
 
 
 def _rows_for_id(cursor, sugar_id: str) -> list[CustomerRow]:
     cursor.execute(SELECT_ROWS_FOR_ID, (sugar_id.strip().lower(),))
-    return [CustomerRow(int(row[0]), row[1]) for row in cursor.fetchall()]
+    return [CustomerRow(int(row[0]), row[1], bool(row[2])) for row in cursor.fetchall()]
 
 
 def pick_row(rows: list[CustomerRow], target: str) -> CustomerRow:
@@ -310,8 +315,18 @@ def resolve_customer_folder(
 
     try:
         cursor = conn.cursor()
-        rows = _rows_for_id(cursor, sugar_id)
+        all_rows = _rows_for_id(cursor, sugar_id)
+        rows = [row for row in all_rows if not row.deleted]
         if not rows:
+            # Only deleted rows: reuse one already under Sugar's name (its
+            # folder is being recreated), never insert a duplicate of it.
+            for row in all_rows:
+                if name_key(row.customer) == name_key(target):
+                    logger.info(
+                        "CUSTOMER_FOLDERS - '%s' was marked deleted; filing there again "
+                        "(the daily sync will undelete it)", row.customer,
+                    )
+                    return row.customer
             try:
                 cursor.execute(INSERT_MINIMAL_ROW, (target, sugar_id))
                 cursor.execute(INSERT_AUDIT_ROW, (target, ROW_ADDED, None, target, source))

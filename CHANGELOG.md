@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1] - 2026-10-09
+
+### Changed
+- Reads `XDRIVE_CUSTOMER_MASTER.deleted` (automation-x-drive-post-report
+  migration 004 renamed `folder_missing` to `deleted`). Needs that migration:
+  against the old column the lookup fails and the file is filed by name.
+- A filing for an account whose only rows are deleted reuses a deleted row
+  already under Sugar's name instead of inserting a duplicate; any other
+  deleted row is ignored (e.g. `Abodus`, merged into `ABODUS LIMITED`).
+
 ## [0.1.0] - 2026-10-09
 
 ### Added
