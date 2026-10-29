@@ -61,6 +61,12 @@ not a Control Room bot: no entry point of its own. Consumers:
   every other client files to the flat `{root}\{YYYY-MM}` folder.
   `destination_folder` raises rather than filing an Inspired-process
   document loose in root when there is no customer name.
+- **Mapped drives are filed through their share (0.1.3).** `unc.DRIVE_MAP`
+  is the office `net use` list (E, I, L, M, O, Q, R, S, T, U, V, W, X, Y).
+  `destination_folder`, `ensure_customer_tree` and `rename_customer_folder`
+  pass `root` through `unc.to_unc()` first, because a run node's service
+  account may not have the letters mapped (or has them mapped to other
+  storage). `unc.from_unc(path, like)` puts a caller's drive letter back.
 
 ## Known Gotchas
 - The import package is `file_allocation_core`, not `file_allocation`: the
@@ -69,6 +75,12 @@ not a Control Room bot: no entry point of its own. Consumers:
   (`repoint_shortcuts`). Without pywin32 they're skipped with a warning and
   x-drive stage 1, which has pywin32, re-points them.
 
+- From 0.1.3 `destination_folder` returns a UNC path when `root` was a
+  mapped drive. A caller that stores or string-matches the returned path
+  (rather than just writing a file there) should map it back with
+  `unc.from_unc(folder, root)`; lib-odc-core does, because pdf-auto matches
+  `ODC_scrape_data.client_file_path` on `O:\ODC_Clients`. If a share in the
+  `net use` list moves, change `DRIVE_MAP`.
 - The caller's `sugar_name` decides renames, so it must be current. ODC and emailed invoices query Sugar live; ebills' Toolkit `/resolve` cache is ~15 min behind; post-allocation's Toolkit alias lookup is up to a day behind (accepted), so it can briefly rename a folder back after a Sugar rename.
 
 ## Change Log
@@ -81,3 +93,7 @@ not a Control Room bot: no entry point of its own. Consumers:
 - 2026-10-09: 0.1.2. Folders are renamed to the exact Sugar name (case,
   Ltd/Limited, &/and and NBSP differences included); `rename_folder`
   handles case-only renames; `pick_row` prefers the exact-name row.
+- 2026-10-29: 0.1.3. New `unc` module (`DRIVE_MAP`, `to_unc`, `from_unc`):
+  a mapped-drive `root` is translated to its UNC share before any folder is
+  created or renamed, so filing works on runners without the drive letters.
+  Not released yet.

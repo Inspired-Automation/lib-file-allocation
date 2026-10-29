@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.3] - 2026-10-29
+
+### Added
+- `unc` module: `DRIVE_MAP` (the office `net use` list: E, I, L, M, O, Q,
+  R, S, T, U, V, W, X, Y), `to_unc(path)` and `from_unc(path, like)`.
+
+### Changed
+- `destination_folder`, `ensure_customer_tree` and `rename_customer_folder`
+  translate a mapped-drive `root` (`X:\POST RECEIVED`) to its UNC share
+  before touching the file system, so filing works on a runner whose
+  service account has no drive letters mapped. `destination_folder` now
+  returns that UNC path; use `unc.from_unc(folder, root)` to get the
+  drive-letter form back.
+
 ## [0.1.2] - 2026-10-09
 
 ### Changed

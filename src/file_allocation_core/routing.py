@@ -21,6 +21,7 @@ from .customer_folders import (
     safe_folder_name,
     write_shortcut,
 )
+from .unc import to_unc
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ class TreeSpec:
 def ensure_customer_tree(customer_root: Path, tree: TreeSpec) -> None:
     """Create any missing folders (and shortcuts) of tree under customer_root.
     Idempotent. Never writes sugar_id.txt."""
-    customer_root = Path(customer_root)
+    customer_root = Path(to_unc(customer_root))
     for doc_type in tree.doc_types:
         for status in tree.statuses:
             status_root = customer_root / doc_type / status
@@ -114,10 +115,13 @@ def destination_folder(
 
     Every other client: {root}\\{YYYY-MM}, the current month.
 
+    A mapped drive in root (X:\\POST RECEIVED) is filed through its UNC
+    share (unc.to_unc), so the returned folder is a UNC path.
+
     Raises ValueError when an Inspired-process filing has no usable customer
     name, rather than filing loose in root.
     """
-    root = Path(root)
+    root = Path(to_unc(root))
     if not is_inspired_client(client_name):
         folder = root / (today or date.today()).strftime("%Y-%m")
         folder.mkdir(parents=True, exist_ok=True)

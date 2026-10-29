@@ -36,6 +36,8 @@ from pathlib import Path
 
 import pyodbc
 
+from .unc import to_unc
+
 logger = logging.getLogger(__name__)
 
 # Fully qualified so every caller can use its existing DSN (in practice
@@ -287,7 +289,7 @@ def rename_customer_folder(conn, root, row: CustomerRow, target: str, source: st
     fails the folder keeps its new name and stage 1's rename pass repairs
     the table (old folder missing, target present).
     """
-    root = Path(root)
+    root = Path(to_unc(root))
     old_path = root / row.customer
     new_path = root / target
     old_exists = old_path.is_dir()
