@@ -96,4 +96,5 @@ not a Control Room bot: no entry point of its own. Consumers:
 - 2026-10-29: 0.1.3. New `unc` module (`DRIVE_MAP`, `to_unc`, `from_unc`):
   a mapped-drive `root` is translated to its UNC share before any folder is
   created or renamed, so filing works on runners without the drive letters.
-  Not released yet.
+  Released 2026-10-29. lib-odc-core 0.13.10 pins it; post-allocation,
+  ebills-allocation and x-drive-post-report are not re-pinned yet.
