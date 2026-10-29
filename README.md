@@ -67,6 +67,12 @@ folder = destination_folder(
 time it's missing. A database problem never stops filing: it logs a warning
 and files under `safe_folder_name(sugar_name)`.
 
+A mapped drive in `root` (`X:\POST RECEIVED`) is translated to its UNC share
+first, and the folder returned is that UNC path. The map is `unc.DRIVE_MAP`
+(the office `net use` list). `unc.to_unc(path)` does the translation for any
+other path; `unc.from_unc(folder, root)` gives back the drive-letter form for
+a caller that records it.
+
 Lower level: `customer_folders.resolve_customer_folder`, `name_key`,
 `safe_folder_name`, `rename_customer_folder`, `repoint_shortcuts`;
 `routing.is_inspired_client`, `normalise_utility`, `ensure_customer_tree`.
